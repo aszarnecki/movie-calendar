@@ -831,9 +831,9 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
 
           {/* Content */}
           <div style={{ position:"relative", height:"100%", display:"flex", flexDirection:"column" }}>
-            <div style={{ flex:1, display:"flex", flexDirection:"column",
+            <div style={{ flex:1, minHeight:0, overflowY:"auto", display:"flex", flexDirection:"column",
               alignItems:"center", justifyContent:"center",
-              padding:"20px 24px 8px", gap:12, textAlign:"center" }}>
+              padding:"12px 24px 8px", gap:10, textAlign:"center" }}>
               <div style={{ fontSize:10, color:`${day.color}99`, letterSpacing:"0.2em",
                 textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", fontWeight:600 }}>
                 {watched ? "✓ Obejrzane" : "Film na ten wieczór"}
@@ -841,16 +841,16 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
               <div style={{ position:"relative" }}>
                 {chosen.poster
                   ? <img src={chosen.poster} alt={chosen.title}
-                      style={{ width:140, height:200, borderRadius:14, objectFit:"cover",
+                      style={{ width:120, height:170, borderRadius:12, objectFit:"cover",
                         filter:watched?"grayscale(60%) brightness(0.45)":"none",
-                        boxShadow:`0 20px 80px ${day.color}44, 0 0 120px ${day.color}18, 0 4px 24px rgba(0,0,0,0.9)`,
+                        boxShadow:`0 16px 60px ${day.color}44, 0 0 80px ${day.color}18, 0 4px 20px rgba(0,0,0,0.9)`,
                         display:"block", border:`1px solid ${day.color}22` }}/>
-                  : <div style={{ width:140, height:200, borderRadius:14, background:"#141414",
-                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:40 }}>🎞</div>
+                  : <div style={{ width:120, height:170, borderRadius:12, background:"#141414",
+                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:36 }}>🎞</div>
                 }
-                {watched && <div style={{ position:"absolute", inset:0, borderRadius:14,
+                {watched && <div style={{ position:"absolute", inset:0, borderRadius:12,
                   background:"rgba(0,0,0,0.62)", display:"flex",
-                  alignItems:"center", justifyContent:"center", fontSize:48 }}>✅</div>}
+                  alignItems:"center", justifyContent:"center", fontSize:44 }}>✅</div>}
               </div>
               {(() => {
                 const dur = parseDuration(chosen.duration);
@@ -888,7 +888,7 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
                 <Lnk href={chosen.filmweb}    label="Filmweb"    bgColor="rgba(255,102,0,0.1)"  bdrColor="rgba(255,102,0,0.3)"  txtColor="#ff8833"/>
               </div>
             </div>
-            <div style={{ display:"flex", gap:10, padding:"10px 20px 20px" }}>
+            <div style={{ display:"flex", gap:10, padding:"10px 20px 20px", flexShrink:0 }}>
               {!watched && !locked
                 ? <button className="action-btn" onClick={onWatched}
                     style={{ flex:1, background:`linear-gradient(135deg, ${day.color}ee, ${day.color}99)`,
