@@ -111,6 +111,177 @@ function FilmModal({ existing, color, onSave, onClose }) {
   );
 }
 
+// ─── JSON Import Modal ───────────────────────────────────────────
+/*
+  Oczekiwany format JSON — tablica filmów (1 lub 2):
+  [
+    {
+      "title":      "Parasite",          // wymagane
+      "year":       "2019",              // opcjonalne
+      "poster":     "https://…jpg",      // opcjonalne
+      "desc":       "Opis filmu",        // opcjonalne
+      "filmweb":    "https://filmweb…",  // opcjonalne
+      "letterboxd": "https://letterboxd…" // opcjonalne
+    }
+  ]
+  Możesz też podać pojedynczy obiekt zamiast tablicy.
+*/
+function ImportModal({ color, existingCount, onImport, onClose }) {
+  const [films,   setFilms]   = useState(null); // parsed preview
+  const [error,   setError]   = useState("");
+  const [replace, setReplace] = useState(false);
+  const fileRef = useRef(null);
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        let parsed = JSON.parse(ev.target.result);
+        if (!Array.isArray(parsed)) parsed = [parsed];
+        // validate
+        const valid = parsed.filter(f => f && typeof f.title === "string" && f.title.trim());
+        if (valid.length === 0) { setError("Brak filmów z polem 'title' w pliku."); setFilms(null); return; }
+        if (valid.length > 2)   { setError(`Plik zawiera ${valid.length} filmów — załaduję pierwsze 2.`); }
+        else { setError(""); }
+        setFilms(valid.slice(0, 2).map(f => ({
+          title:      String(f.title || "").trim(),
+          year:       String(f.year  || "").trim(),
+          poster:     String(f.poster || "").trim(),
+          desc:       String(f.desc  || f.description || "").trim(),
+          filmweb:    String(f.filmweb    || "").trim(),
+          letterboxd: String(f.letterboxd || "").trim(),
+        })));
+      } catch {
+        setError("Nieprawidłowy JSON. Sprawdź format pliku.");
+        setFilms(null);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const slots = 2 - (replace ? 0 : existingCount);
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", zIndex:100,
+      display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{ width:"100%", maxWidth:520, background:"#0e0e0e",
+        borderRadius:"16px 16px 0 0", padding:"20px 20px 36px",
+        border:"1px solid #1e1e1e", maxHeight:"90vh", overflowY:"auto" }}>
+
+        {/* Header */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <span style={{ fontFamily:"'Cinzel',serif", fontSize:13, color, letterSpacing:"0.06em" }}>
+            📂 Import JSON
+          </span>
+          <button onClick={onClose} style={{ background:"none", border:"none",
+            color:"#444", fontSize:20, cursor:"pointer" }}>×</button>
+        </div>
+
+        {/* Format hint */}
+        <div style={{ background:"#0a0a0a", border:"1px solid #1a1a1a", borderRadius:10,
+          padding:"12px 14px", marginBottom:16, fontSize:11, color:"#3a3a3a", lineHeight:1.8 }}>
+          <div style={{ color:"#555", marginBottom:6, fontWeight:700 }}>Oczekiwany format:</div>
+          <pre style={{ margin:0, fontFamily:"monospace", fontSize:10, color:"#2e2e2e",
+            whiteSpace:"pre-wrap" }}>{`[
+  {
+    "title":      "Parasite",
+    "year":       "2019",
+    "poster":     "https://…jpg",
+    "desc":       "Opis",
+    "filmweb":    "https://filmweb.pl/…",
+    "letterboxd": "https://letterboxd.com/…"
+  }
+]`}</pre>
+        </div>
+
+        {/* File picker */}
+        <input ref={fileRef} type="file" accept=".json,application/json"
+          onChange={handleFile} style={{ display:"none" }}/>
+        <button onClick={() => fileRef.current?.click()}
+          style={{ width:"100%", background:"transparent",
+            border:`1px dashed ${color}55`, borderRadius:10, padding:"14px 0",
+            color, cursor:"pointer", fontSize:13, marginBottom:12,
+            fontFamily:"'Lato',sans-serif" }}>
+          📁 Wybierz plik .json
+        </button>
+
+        {error && (
+          <div style={{ fontSize:11, color:"#e07a5f", background:"rgba(224,122,95,0.08)",
+            border:"1px solid rgba(224,122,95,0.2)", borderRadius:8,
+            padding:"8px 12px", marginBottom:12 }}>{error}</div>
+        )}
+
+        {/* Preview */}
+        {films && (
+          <>
+            <div style={{ fontSize:10, color:"#3a3a3a", letterSpacing:"0.1em",
+              textTransform:"uppercase", marginBottom:8 }}>
+              Podgląd · {films.length} film{films.length > 1 ? "y" : ""}
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:16 }}>
+              {films.map((m, i) => (
+                <div key={i} style={{ display:"flex", gap:10, background:"#111",
+                  borderRadius:10, padding:"10px 12px", border:"1px solid #1a1a1a",
+                  alignItems:"center" }}>
+                  {m.poster
+                    ? <img src={m.poster} alt={m.title}
+                        style={{ width:38, height:54, objectFit:"cover", borderRadius:5, flexShrink:0 }}
+                        onError={e=>e.target.style.opacity=0.15}/>
+                    : <div style={{ width:38, height:54, borderRadius:5, background:"#1a1a1a",
+                        flexShrink:0, display:"flex", alignItems:"center",
+                        justifyContent:"center", fontSize:16 }}>🎞</div>
+                  }
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:700, fontSize:13 }}>{m.title}</div>
+                    <div style={{ fontSize:11, color:"#555" }}>
+                      {[m.year, m.filmweb&&"Filmweb ✓", m.letterboxd&&"Letterboxd ✓"]
+                        .filter(Boolean).join(" · ")}
+                    </div>
+                    {m.desc && <div style={{ fontSize:11, color:"#3a3a3a", marginTop:2,
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{m.desc}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Replace toggle */}
+            {existingCount > 0 && (
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16,
+                background:"#0a0a0a", borderRadius:8, padding:"10px 14px",
+                border:"1px solid #1a1a1a" }}>
+                <button onClick={() => setReplace(p=>!p)}
+                  style={{ width:36, height:20, borderRadius:10, border:"none", cursor:"pointer",
+                    background: replace?color:"#222", position:"relative", flexShrink:0,
+                    transition:"background 0.2s" }}>
+                  <div style={{ width:14, height:14, borderRadius:"50%", background:"#e8e0d0",
+                    position:"absolute", top:3, transition:"left 0.2s",
+                    left: replace?"19px":"3px" }}/>
+                </button>
+                <span style={{ fontSize:12, color:"#555" }}>
+                  {replace
+                    ? "Zastąp istniejące filmy"
+                    : `Dodaj do istniejących (wolne miejsca: ${slots})`}
+                </span>
+              </div>
+            )}
+
+            <button
+              onClick={() => onImport(films, replace)}
+              style={{ width:"100%", background:color, border:"none", borderRadius:8,
+                padding:"13px 0", color:"#060606", fontWeight:700,
+                cursor:"pointer", fontSize:15 }}>
+              ✓ Importuj {films.length > slots && !replace ? `(${slots} z ${films.length})` : ""}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Theme Modal ─────────────────────────────────────────────────
 function ThemeModal({ dayKey, configs, onSave, onClose }) {
   const cur  = resolveDay(dayKey, configs);
@@ -585,6 +756,13 @@ export default function App() {
   const resetChoice  = (k)     => setDayMovies(p => ({ ...p, [k]: { ...(p[k]||{}), chosenId:null, watched:false } }));
   const markWatched  = (k)     => setDayMovies(p => ({ ...p, [k]: { ...(p[k]||{}), watched:true } }));
 
+  const importFilms = (k, films, replace) => setDayMovies(p => {
+    const existing = replace ? [] : (p[k]?.candidates || []);
+    const slots    = 2 - existing.length;
+    const toAdd    = films.slice(0, slots).map(f => ({ ...f, id: Date.now() + Math.random() }));
+    return { ...p, [k]: { ...(p[k]||{}), candidates: [...existing, ...toAdd] } };
+  });
+
   const saveTheme = (k, name, icon, color, tempUntil, reset) => setDayConfigs(p => {
     const ex = p[k] || {};
     if (reset) { const {override,...r}=ex; return {...p,[k]:{...r,name:undefined,icon:undefined,color:undefined}}; }
@@ -651,12 +829,20 @@ export default function App() {
             {cands.length === 2 && "2 propozycje · gotowe do losowania"}
           </div>
           {isAdmin && cands.length < 2 && !mov.chosenId && (
-            <button onClick={() => setModal({type:"film"})}
-              style={{ background:`${day.color}18`, border:`1px solid ${day.color}33`,
-                borderRadius:7, padding:"5px 12px", color:day.color,
-                cursor:"pointer", fontSize:11, fontWeight:700 }}>
-              ➕ Film
-            </button>
+            <div style={{ display:"flex", gap:6 }}>
+              <button onClick={() => setModal({type:"film"})}
+                style={{ background:`${day.color}18`, border:`1px solid ${day.color}33`,
+                  borderRadius:7, padding:"5px 12px", color:day.color,
+                  cursor:"pointer", fontSize:11, fontWeight:700 }}>
+                ➕ Film
+              </button>
+              <button onClick={() => setModal({type:"import"})}
+                style={{ background:"transparent", border:"1px solid #1e1e1e",
+                  borderRadius:7, padding:"5px 12px", color:"#555",
+                  cursor:"pointer", fontSize:11, fontWeight:700 }}>
+                📂 JSON
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -712,6 +898,14 @@ export default function App() {
           existing={modal.movie}
           color={day.color}
           onSave={m => { saveFilm(selDay, m); setModal(null); }}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal?.type === "import" && (
+        <ImportModal
+          color={day.color}
+          existingCount={cands.length}
+          onImport={(films, replace) => { importFilms(selDay, films, replace); setModal(null); }}
           onClose={() => setModal(null)}
         />
       )}
