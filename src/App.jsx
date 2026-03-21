@@ -674,6 +674,35 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
     }, 400);
   };
 
+  const playTick = (pitch = 800, dur = 0.04) => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = pitch;
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + dur);
+    } catch {}
+  };
+  const playFanfare = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.12, 0.24, 0.42].forEach((t, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = i < 3 ? "triangle" : "sine";
+        osc.frequency.value = [523, 659, 784, 1047][i];
+        gain.gain.setValueAtTime(0.1, ctx.currentTime + t);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + (i < 3 ? 0.12 : 0.35));
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.4);
+      });
+    } catch {}
+  };
+
   const doSpin = () => {
     if (spinning || movies.length < 2 || locked) return;
     setSpinning(true);
@@ -682,9 +711,11 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
     const ids=[a?.id,b?.id].filter(Boolean);
     const tick=()=>{
       setHlit(ids[count%2]); count++;
+      const pitch = 600 + (count / total) * 600;
+      playTick(pitch, 0.04);
       const delay=count<total-5?80:80+(count-(total-5))*130;
       if(count<total){timerRef.current=setTimeout(tick,delay);}
-      else{setHlit(winner.id);setSpinning(false);handleChoose(winner.id);}
+      else{setHlit(winner.id);setSpinning(false);handleChoose(winner.id);playFanfare();}
     };
     tick();
   };
@@ -847,7 +878,8 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
                       </>}
                     </div>
                     {chosen.desc && <div style={{ fontSize:12, color:"#3a3a3a", lineHeight:1.65,
-                      marginTop:8, fontStyle:"italic", maxWidth:240,
+                      marginTop:8, fontStyle:"italic", maxWidth:240, maxHeight:80,
+                      overflowY:"auto", scrollbarWidth:"none", msOverflowStyle:"none",
                       fontFamily:"'Playfair Display',serif" }}>{chosen.desc}</div>}
                   </div>
                 );
@@ -1283,10 +1315,25 @@ export default function App() {
 
   const goToDate = (ds) => {
     if (ds === selDate) return;
-    const oldIdx = BASE_DAYS.findIndex(d => d.key === dateToKey(selDate));
-    const newIdx = BASE_DAYS.findIndex(d => d.key === dateToKey(ds));
-    setSlideDir(newIdx >= oldIdx ? "left" : "right");
+    setSlideDir(ds > selDate ? "left" : "right");
     setSelDate(ds);
+  };
+
+  // Swipe between days
+  const swipeRef = useRef({ startX:0, startY:0 });
+  const onTouchStart = (e) => {
+    swipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY };
+  };
+  const onTouchEnd = (e) => {
+    const dx = e.changedTouches[0].clientX - swipeRef.current.startX;
+    const dy = e.changedTouches[0].clientY - swipeRef.current.startY;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)) return;
+    const d = new Date(selDate + "T12:00:00");
+    d.setDate(d.getDate() + (dx < 0 ? 1 : -1));
+    const next = d.toISOString().slice(0,10);
+    // Stay within current month
+    if (new Date(next + "T12:00:00").getMonth() !== new Date(todayStr + "T12:00:00").getMonth()) return;
+    goToDate(next);
   };
   const isAdmin = role === "admin";
 
@@ -1346,7 +1393,10 @@ export default function App() {
   });
 
   const chooseMovie  = (k, id) => setDayMovies(p => ({ ...p, [k]: { ...(p[k]||{}), chosenId:id, watched:false } }));
-  const resetChoice  = (k)     => setDayMovies(p => ({ ...p, [k]: { ...(p[k]||{}), chosenId:null, watched:false } }));
+  const resetChoice  = (k)     => {
+    setDayMovies(p => ({ ...p, [k]: { ...(p[k]||{}), chosenId:null, watched:false } }));
+    setHistory(h => { const n = {...h}; delete n[k]; return n; });
+  };
   const clearDay     = (k)     => setDayMovies(p => { const n = {...p}; delete n[k]; return n; });
   const markWatched  = (k) => {
     setDayMovies(p => {
@@ -1492,7 +1542,8 @@ export default function App() {
         flexShrink:0 }}/>
 
       {/* ── Main split area ── */}
-      <div key={selDate} style={{ flex:1, minHeight:0, display:"flex", flexDirection:"column",
+      <div key={selDate} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+        style={{ flex:1, minHeight:0, display:"flex", flexDirection:"column",
         overflow:"hidden", position:"relative",
         animation: slideDir === "left"
           ? "slideInRight 0.32s cubic-bezier(0.22,1,0.36,1) both"
