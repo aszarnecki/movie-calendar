@@ -1,6 +1,106 @@
 import { useState, useEffect, useRef } from "react";
 import { login, getRole, logout } from "./auth.js";
 
+// ─── Global styles injected once ────────────────────────────────
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=Cinzel:wght@400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold: #c9a96e;
+    --gold-dim: #7a6340;
+    --bg: #050505;
+    --surface: #0d0d0d;
+    --border: #1a1a1a;
+  }
+
+  body { background: var(--bg); overscroll-behavior: none; }
+
+  /* Film grain overlay */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+    opacity: 0.4;
+  }
+
+  /* Keyframes */
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(18px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity:0; }
+    to   { opacity:1; }
+  }
+  @keyframes slideUp {
+    from { opacity:0; transform:translateY(40px) scale(0.97); }
+    to   { opacity:1; transform:translateY(0) scale(1); }
+  }
+  @keyframes revealPoster {
+    from { opacity:0; transform:scale(0.88) translateY(24px); filter:blur(8px); }
+    to   { opacity:1; transform:scale(1) translateY(0); filter:blur(0); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity:1; }
+    50%       { opacity:0.5; }
+  }
+  @keyframes spinnerRing {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes dotPop {
+    0%  { transform: scale(0.6); opacity:0; }
+    60% { transform: scale(1.3); }
+    100%{ transform: scale(1); opacity:1; }
+  }
+  @keyframes cardReveal {
+    from { opacity:0; transform:scale(0.94); }
+    to   { opacity:1; transform:scale(1); }
+  }
+  @keyframes expandFromLeft {
+    from { transform: scaleX(0.5) translateX(-50%) scaleY(0.78); opacity:0.5; }
+    to   { transform: scaleX(1)   translateX(0)    scaleY(1);    opacity:1;   }
+  }
+  @keyframes expandFromRight {
+    from { transform: scaleX(0.5) translateX(50%)  scaleY(0.78); opacity:0.5; }
+    to   { transform: scaleX(1)   translateX(0)    scaleY(1);    opacity:1;   }
+  }
+  @keyframes shrinkToLeft {
+    from { transform: scaleX(1)   translateX(0)    scaleY(1);    opacity:1;   }
+    to   { transform: scaleX(0.5) translateX(-50%) scaleY(0.78); opacity:0;   }
+  }
+  @keyframes shrinkToRight {
+    from { transform: scaleX(1)   translateX(0)    scaleY(1);    opacity:1;   }
+    to   { transform: scaleX(0.5) translateX(50%)  scaleY(0.78); opacity:0;   }
+  }
+
+  .film-card { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+  .film-card:active { transform: scale(0.97) !important; }
+
+  .day-btn { transition: all 0.18s ease; }
+  .day-btn:active { transform: scale(0.93); }
+
+  .numpad-btn { transition: background 0.1s, transform 0.1s; }
+  .numpad-btn:active { transform: scale(0.9); background: #1e1e1e !important; }
+
+  .action-btn { transition: all 0.2s ease; }
+  .action-btn:hover { filter: brightness(1.1); }
+  .action-btn:active { transform: scale(0.96); }
+
+  input::placeholder { color: #2e2e2e; }
+  input:focus { border-color: #333 !important; }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1e1e1e; border-radius: 2px; }
+`;
+
 const BASE_DAYS = [
   { key:"mon", name:"Azjatycki Poniedziałek", icon:"🎋", color:"#e07a5f", short:"Pon", jsDay:1 },
   { key:"tue", name:"Polski Wtorek",          icon:"🦅", color:"#f2cc8f", short:"Wt",  jsDay:2 },
@@ -25,31 +125,85 @@ function resolveDay(key, configs) {
   return { ...base, name:cfg.name||base.name, icon:cfg.icon||base.icon, color:cfg.color||base.color, isTemp:false };
 }
 
+// ─── CSS injection ───────────────────────────────────────────────
+function GlobalStyles() {
+  useEffect(() => {
+    const el = document.createElement("style");
+    el.textContent = GLOBAL_CSS;
+    document.head.appendChild(el);
+    return () => el.remove();
+  }, []);
+  return null;
+}
+
+// ─── Logo SVG ────────────────────────────────────────────────────
+function CinemaLogo({ size = 64, glow = false }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ filter: glow ? "drop-shadow(0 0 20px rgba(201,169,110,0.5))" : "none" }}>
+      {/* Film strip body */}
+      <rect x="8" y="18" width="48" height="28" rx="3" fill="#1a1a1a" stroke="#c9a96e" strokeWidth="1.5"/>
+      {/* Sprocket holes left */}
+      <rect x="11" y="22" width="5" height="5" rx="1" fill="#050505" stroke="#c9a96e44" strokeWidth="0.5"/>
+      <rect x="11" y="30" width="5" height="5" rx="1" fill="#050505" stroke="#c9a96e44" strokeWidth="0.5"/>
+      <rect x="11" y="38" width="5" height="5" rx="1" fill="#050505" stroke="#c9a96e44" strokeWidth="0.5"/>
+      {/* Sprocket holes right */}
+      <rect x="48" y="22" width="5" height="5" rx="1" fill="#050505" stroke="#c9a96e44" strokeWidth="0.5"/>
+      <rect x="48" y="30" width="5" height="5" rx="1" fill="#050505" stroke="#c9a96e44" strokeWidth="0.5"/>
+      <rect x="48" y="38" width="5" height="5" rx="1" fill="#050505" stroke="#c9a96e44" strokeWidth="0.5"/>
+      {/* Frame area */}
+      <rect x="20" y="21" width="24" height="22" rx="2" fill="#0a0a0a" stroke="#c9a96e33" strokeWidth="0.5"/>
+      {/* Play triangle */}
+      <path d="M27 27 L27 37 L37 32 Z" fill="#c9a96e" opacity="0.9"/>
+      {/* Top/bottom strips */}
+      <rect x="8" y="14" width="48" height="4" rx="1.5" fill="#111" stroke="#c9a96e33" strokeWidth="0.5"/>
+      <rect x="8" y="46" width="48" height="4" rx="1.5" fill="#111" stroke="#c9a96e33" strokeWidth="0.5"/>
+      {/* Dot accents on strips */}
+      {[14,22,30,38,46,54].map(x => (
+        <circle key={x} cx={x} cy="16" r="1" fill="#c9a96e55"/>
+      ))}
+      {[14,22,30,38,46,54].map(x => (
+        <circle key={x} cx={x} cy="48" r="1" fill="#c9a96e55"/>
+      ))}
+    </svg>
+  );
+}
+
 // ─── utils ───────────────────────────────────────────────────────
 function Lnk({ href, label, bgColor, bdrColor, txtColor }) {
   if (!href) return null;
   return <a href={href} target="_blank" rel="noreferrer"
-    style={{ fontSize:11, padding:"4px 10px", background:bgColor, border:`1px solid ${bdrColor}`,
-      borderRadius:5, color:txtColor, textDecoration:"none", fontWeight:700 }}>{label} ↗</a>;
+    style={{ fontSize:11, padding:"5px 12px", background:bgColor, border:`1px solid ${bdrColor}`,
+      borderRadius:20, color:txtColor, textDecoration:"none", fontWeight:600,
+      letterSpacing:"0.04em", transition:"opacity 0.15s" }}
+    onMouseEnter={e=>e.target.style.opacity=0.8}
+    onMouseLeave={e=>e.target.style.opacity=1}>
+    {label} ↗
+  </a>;
 }
 
 function Field({ label, value, onChange, placeholder, mono, hint }) {
   return (
     <div>
-      <label style={{ fontSize:10, color:"#3a3a3a", letterSpacing:"0.1em",
-        textTransform:"uppercase", display:"block", marginBottom:5 }}>{label}</label>
+      <label style={{ fontSize:10, color:"#383838", letterSpacing:"0.12em",
+        textTransform:"uppercase", display:"block", marginBottom:6,
+        fontFamily:"'DM Sans',sans-serif", fontWeight:600 }}>{label}</label>
       <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-        style={{ width:"100%", boxSizing:"border-box", background:"#111", border:"1px solid #1e1e1e",
-          borderRadius:8, padding:"10px 12px", color:"#e8e0d0", fontSize:mono?12:14,
-          outline:"none", fontFamily:mono?"monospace":"'Lato',sans-serif" }}/>
-      {hint && <div style={{ fontSize:10, color:"#2e2e2e", marginTop:4 }}>{hint}</div>}
+        style={{ width:"100%", background:"#080808", border:"1px solid #1e1e1e",
+          borderRadius:10, padding:"11px 14px", color:"#e8e0d0",
+          fontSize:mono?12:14, outline:"none",
+          fontFamily:mono?"monospace":"'DM Sans',sans-serif",
+          transition:"border-color 0.15s" }}/>
+      {hint && <div style={{ fontSize:10, color:"#252525", marginTop:5,
+        fontFamily:"'DM Sans',sans-serif" }}>{hint}</div>}
     </div>
   );
 }
 
 // ─── Film Add/Edit Modal ─────────────────────────────────────────
 function FilmModal({ existing, color, onSave, onClose }) {
-  const [f, setF] = useState(existing || { title:"", year:"", poster:"", desc:"", filmweb:"", letterboxd:"" });
+  const [f, setF] = useState(existing || { title:"", year:"", duration:"", poster:"", desc:"", filmweb:"", letterboxd:"" });
   const set = k => v => setF(p => ({...p,[k]:v}));
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:100,
@@ -78,6 +232,26 @@ function FilmModal({ existing, color, onSave, onClose }) {
             </div>
           </div>
           <Field label="Opis" value={f.desc} onChange={set("desc")} placeholder="Krótki opis…"/>
+          <div>
+            <label style={{ fontSize:10, color:"#383838", letterSpacing:"0.12em",
+              textTransform:"uppercase", display:"block", marginBottom:6,
+              fontFamily:"'DM Sans',sans-serif", fontWeight:600 }}>Czas trwania (minuty)</label>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <input type="number" value={f.duration} onChange={e=>set("duration")(e.target.value)}
+                placeholder="np. 120" min="1" max="300"
+                style={{ width:100, background:"#080808", border:"1px solid #1e1e1e",
+                  borderRadius:10, padding:"11px 14px", color:"#e8e0d0", fontSize:14,
+                  outline:"none", fontFamily:"'DM Sans',sans-serif" }}/>
+              {parseDuration(f.duration) && (() => {
+                const dur = durationLabel(parseDuration(f.duration));
+                return (
+                  <span style={{ fontSize:12, color:dur.color, fontFamily:"'DM Sans',sans-serif" }}>
+                    {formatDuration(parseDuration(f.duration))} · {dur.label}
+                  </span>
+                );
+              })()}
+            </div>
+          </div>
           <Field label="URL plakatu" value={f.poster} onChange={set("poster")}
             placeholder="https://…jpg" mono
             hint="Google Grafika → prawy klik na plakat → Kopiuj adres obrazu"/>
@@ -379,13 +553,57 @@ function ThemeModal({ dayKey, configs, onSave, onClose }) {
   );
 }
 
+// ─── Duration helpers ────────────────────────────────────────────
+function parseDuration(val) {
+  if (!val) return null;
+  const n = parseInt(val);
+  return isNaN(n) || n <= 0 ? null : n;
+}
+function formatDuration(min) {
+  if (!min) return null;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? (m > 0 ? `${h}h ${m}min` : `${h}h`) : `${m}min`;
+}
+function durationLabel(min) {
+  if (!min) return null;
+  if (min < 90)  return { label:"Krótki",  color:"#81b29a" };
+  if (min < 130) return { label:"Średni",  color:"#c9a96e" };
+  return             { label:"Długi",   color:"#e07a5f" };
+}
+
 // ─── Split Hero — 2 filmy obok siebie ────────────────────────────
 function SplitHero({ day, movies, chosenId, watched, isAdmin, onChoose, onReset, onWatched, onEditFilm, onAddFilm }) {
-  const [spinning, setSpinning] = useState(false);
-  const [hlit,     setHlit]     = useState(null);
-  const timerRef = useRef(null);
-  const [a, b]   = movies;
-  const chosen   = movies.find(m => m.id === chosenId);
+  const [spinning,  setSpinning]  = useState(false);
+  const [hlit,      setHlit]      = useState(null);
+  const [rect,      setRect]      = useState(null);   // {top,left,width,height} of clicked card
+  const [expanded,  setExpanded]  = useState(false);  // overlay reached full size
+  const [collapsing,setCollapsing]= useState(false);  // shrinking back
+  const timerRef  = useRef(null);
+  const leftRef   = useRef(null);
+  const rightRef  = useRef(null);
+  const [a, b]    = movies;
+  const chosen    = movies.find(m => m.id === chosenId);
+
+  useEffect(() => {
+    if (!chosenId) { setHlit(null); setRect(null); setExpanded(false); setCollapsing(false); }
+  }, [chosenId]);
+
+  const handleChoose = (id, ref) => {
+    if (!ref?.current) { onChoose(id); return; }
+    const r = ref.current.getBoundingClientRect();
+    setRect({ top:r.top, left:r.left, width:r.width, height:r.height });
+    setExpanded(false);
+    onChoose(id);
+    // after one frame start expanding
+    requestAnimationFrame(() => requestAnimationFrame(() => setExpanded(true)));
+  };
+
+  const handleReset = () => {
+    setCollapsing(true);
+    setExpanded(false);
+    setTimeout(() => { onReset(); setCollapsing(false); }, 400);
+  };
 
   const doSpin = () => {
     if (spinning || movies.length < 2) return;
@@ -397,68 +615,153 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, onChoose, onReset,
       setHlit(ids[count%2]); count++;
       const delay=count<total-5?80:80+(count-(total-5))*130;
       if(count<total){timerRef.current=setTimeout(tick,delay);}
-      else{setHlit(winner.id);setSpinning(false);onChoose(winner.id);}
+      else{
+        setHlit(winner.id); setSpinning(false);
+        const ref = (winner.id === a?.id) ? leftRef : rightRef;
+        handleChoose(winner.id, ref);
+      }
     };
     tick();
   };
   useEffect(()=>()=>clearTimeout(timerRef.current),[]);
 
-  // ── Chosen state ──
-  if (chosen && !spinning) return (
-    <div style={{ flex:1, display:"flex", flexDirection:"column", position:"relative", overflow:"hidden" }}>
-      {/* Blurred bg */}
-      {chosen.poster && (
+  // ── Overlay (hero transition) ──
+  if (chosen && !spinning && rect) {
+    const dur = parseDuration(chosen.duration);
+    const durLabel = durationLabel(dur);
+    // Collapsed = card rect, Expanded = full viewport
+    const style = {
+      position:   "fixed",
+      overflow:   "hidden",
+      zIndex:     50,
+      transition: collapsing
+        ? "top 0.38s cubic-bezier(0.4,0,0.6,1), left 0.38s cubic-bezier(0.4,0,0.6,1), width 0.38s cubic-bezier(0.4,0,0.6,1), height 0.38s cubic-bezier(0.4,0,0.6,1), border-radius 0.38s cubic-bezier(0.4,0,0.6,1)"
+        : "top 0.44s cubic-bezier(0.22,1,0.36,1), left 0.44s cubic-bezier(0.22,1,0.36,1), width 0.44s cubic-bezier(0.22,1,0.36,1), height 0.44s cubic-bezier(0.22,1,0.36,1), border-radius 0.44s cubic-bezier(0.22,1,0.36,1)",
+      top:          (collapsing || !expanded) ? rect.top    : 0,
+      left:         (collapsing || !expanded) ? rect.left   : 0,
+      width:        (collapsing || !expanded) ? rect.width  : "100vw",
+      height:       (collapsing || !expanded) ? rect.height : "100dvh",
+      borderRadius: (collapsing || !expanded) ? "14px"      : "0px",
+    };
+
+    return (
+      <div style={style}>
+        {/* Poster blurs into bg as overlay expands */}
+        {chosen.poster && (
+          <div style={{ position:"absolute", inset:0,
+            backgroundImage:`url(${chosen.poster})`,
+            backgroundSize:"cover", backgroundPosition:"center",
+            filter: expanded && !collapsing
+              ? "blur(30px) brightness(0.18) saturate(1.5)"
+              : "blur(2px) brightness(0.55)",
+            transform:"scale(1.08)",
+            transition:"filter 0.55s ease 0.1s" }}/>
+        )}
+        {!chosen.poster && <div style={{ position:"absolute", inset:0, background:"#050505" }}/>}
         <div style={{ position:"absolute", inset:0,
-          backgroundImage:`url(${chosen.poster})`,
-          backgroundSize:"cover", backgroundPosition:"center",
-          filter:"blur(22px) brightness(0.25)", transform:"scale(1.1)" }}/>
-      )}
-      <div style={{ position:"relative", flex:1, display:"flex", flexDirection:"column",
-        alignItems:"center", justifyContent:"center", padding:"24px 20px", gap:16, textAlign:"center" }}>
-        <div style={{ fontSize:11, color:`${day.color}aa`, letterSpacing:"0.14em",
-          textTransform:"uppercase" }}>{watched?"✓ Obejrzane":"Film na ten wieczór"}</div>
-        <div style={{ position:"relative" }}>
-          {chosen.poster
-            ? <img src={chosen.poster} alt={chosen.title}
-                style={{ width:130, height:186, borderRadius:12, objectFit:"cover",
-                  filter:watched?"grayscale(55%) brightness(0.5)":"none",
-                  boxShadow:`0 8px 60px ${day.color}55` }}/>
-            : <div style={{ width:130, height:186, borderRadius:12, background:"#181818",
-                display:"flex", alignItems:"center", justifyContent:"center", fontSize:36 }}>🎞</div>
-          }
-          {watched && (
-            <div style={{ position:"absolute", inset:0, borderRadius:12,
-              background:"rgba(0,0,0,0.6)", display:"flex",
-              alignItems:"center", justifyContent:"center", fontSize:52 }}>✅</div>
-          )}
-        </div>
-        <div>
-          <div style={{ fontFamily:"'Cinzel',serif", fontSize:18, color:"#f0e8d8",
-            lineHeight:1.4, marginBottom:4 }}>{chosen.title}</div>
-          {chosen.year && <div style={{ fontSize:12, color:"#666" }}>{chosen.year}</div>}
-          {chosen.desc && <div style={{ fontSize:12, color:"#444", lineHeight:1.6,
-            marginTop:6, fontStyle:"italic", maxWidth:260 }}>{chosen.desc}</div>}
-        </div>
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"center" }}>
-          <Lnk href={chosen.filmweb}    label="Filmweb"    bgColor="rgba(255,102,0,0.12)" bdrColor="rgba(255,102,0,0.4)"  txtColor="#ff8833"/>
-          <Lnk href={chosen.letterboxd} label="Letterboxd" bgColor="rgba(0,230,130,0.08)" bdrColor="rgba(0,230,130,0.35)" txtColor="#00c27a"/>
-        </div>
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"center", marginTop:4 }}>
-          {!watched && (
-            <button onClick={onWatched}
-              style={{ background:`${day.color}22`, border:`1px solid ${day.color}66`,
-                borderRadius:10, padding:"12px 28px", color:day.color, cursor:"pointer",
-                fontSize:14, fontWeight:700 }}>✓ Obejrzane</button>
-          )}
-          <button onClick={onReset}
-            style={{ background:"rgba(255,255,255,0.04)", border:"1px solid #222",
-              borderRadius:10, padding:"12px 20px", color:"#555", cursor:"pointer", fontSize:13 }}>
-            Zmień wybór
-          </button>
+          background:"linear-gradient(to bottom, rgba(5,5,5,0.1) 0%, transparent 40%, rgba(5,5,5,0.75) 100%)",
+          opacity: expanded && !collapsing ? 1 : 0, transition:"opacity 0.4s ease 0.15s" }}/>
+
+        {/* Content — only visible when fully expanded */}
+        <div style={{ position:"relative", height:"100%", display:"flex", flexDirection:"column",
+          opacity: expanded && !collapsing ? 1 : 0,
+          transition:"opacity 0.35s ease 0.2s",
+          pointerEvents: expanded && !collapsing ? "auto" : "none" }}>
+
+          <div style={{ flex:1, display:"flex", flexDirection:"column",
+            alignItems:"center", justifyContent:"center",
+            padding:"20px 24px 8px", gap:12, textAlign:"center" }}>
+
+            <div style={{ fontSize:10, color:`${day.color}99`, letterSpacing:"0.2em",
+              textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", fontWeight:600 }}>
+              {watched ? "✓ Obejrzane" : "Film na ten wieczór"}
+            </div>
+
+            <div style={{ position:"relative" }}>
+              {chosen.poster
+                ? <img src={chosen.poster} alt={chosen.title}
+                    style={{ width:140, height:200, borderRadius:14, objectFit:"cover",
+                      filter:watched?"grayscale(60%) brightness(0.45)":"none",
+                      boxShadow:`0 16px 80px ${day.color}55, 0 4px 24px rgba(0,0,0,0.9)`,
+                      display:"block", border:`1px solid ${day.color}22` }}/>
+                : <div style={{ width:140, height:200, borderRadius:14, background:"#141414",
+                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:40 }}>🎞</div>
+              }
+              {watched && (
+                <div style={{ position:"absolute", inset:0, borderRadius:14,
+                  background:"rgba(0,0,0,0.62)", display:"flex",
+                  alignItems:"center", justifyContent:"center", fontSize:48 }}>✅</div>
+              )}
+            </div>
+
+            <div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontSize:19, color:"#f0e8d8",
+                lineHeight:1.35, fontWeight:700, marginBottom:4, maxWidth:250 }}>
+                {chosen.title}
+              </div>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
+                gap:8, flexWrap:"wrap" }}>
+                {chosen.year && (
+                  <span style={{ fontSize:12, color:"#444", fontFamily:"'DM Sans',sans-serif" }}>
+                    {chosen.year}
+                  </span>
+                )}
+                {dur && (
+                  <>
+                    <span style={{ color:"#222", fontSize:10 }}>·</span>
+                    <span style={{ fontSize:11, color:"#555", fontFamily:"'DM Sans',sans-serif" }}>
+                      {formatDuration(dur)}
+                    </span>
+                    <span style={{ fontSize:10, padding:"2px 8px",
+                      background:`${durLabel.color}18`, border:`1px solid ${durLabel.color}33`,
+                      borderRadius:20, color:durLabel.color,
+                      fontFamily:"'DM Sans',sans-serif", fontWeight:600 }}>
+                      {durLabel.label}
+                    </span>
+                  </>
+                )}
+              </div>
+              {chosen.desc && (
+                <div style={{ fontSize:12, color:"#3a3a3a", lineHeight:1.65, marginTop:8,
+                  fontStyle:"italic", maxWidth:240, fontFamily:"'Playfair Display',serif" }}>
+                  {chosen.desc}
+                </div>
+              )}
+            </div>
+
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"center" }}>
+              <Lnk href={chosen.filmweb}    label="Filmweb"    bgColor="rgba(255,102,0,0.1)"  bdrColor="rgba(255,102,0,0.3)"  txtColor="#ff8833"/>
+              <Lnk href={chosen.letterboxd} label="Letterboxd" bgColor="rgba(0,230,130,0.07)" bdrColor="rgba(0,230,130,0.3)"  txtColor="#00c27a"/>
+            </div>
+          </div>
+
+          <div style={{ display:"flex", gap:10, padding:"10px 20px 20px" }}>
+            {!watched ? (
+              <button className="action-btn" onClick={onWatched}
+                style={{ flex:1, background:`linear-gradient(135deg, ${day.color}ee, ${day.color}99)`,
+                  border:"none", borderRadius:14, padding:"14px 0",
+                  color:"#050505", cursor:"pointer", fontSize:14, fontWeight:700,
+                  fontFamily:"'DM Sans',sans-serif", boxShadow:`0 4px 24px ${day.color}44` }}>
+                ✓ Obejrzane
+              </button>
+            ) : (
+              <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize:13, color:"#2e2e2e", fontFamily:"'DM Sans',sans-serif" }}>
+                Dobry wybór 🎉
+              </div>
+            )}
+            <button className="action-btn" onClick={handleReset}
+              style={{ background:"rgba(255,255,255,0.04)", border:"1px solid #1e1e1e",
+                borderRadius:14, padding:"14px 18px", color:"#444",
+                cursor:"pointer", fontSize:13, fontFamily:"'DM Sans',sans-serif",
+                whiteSpace:"nowrap" }}>
+              Zmień
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   // ── Split view ──
   const noFilms = movies.length === 0;
@@ -479,68 +782,93 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, onChoose, onReset,
     </div>
   );
 
-  const CardHalf = ({ movie, side, lit }) => {
+  const CardHalf = ({ movie, side, lit, cardRef }) => {
     const bg = movie?.poster;
     const isLeft = side === "left";
     return (
-      <div style={{ flex:1, position:"relative", overflow:"hidden",
-        cursor:"pointer", borderRadius: isLeft?"12px 0 0 12px":"0 12px 12px 0" }}
-        onClick={() => !spinning && movie && onChoose(movie.id)}>
-        {/* Poster bg */}
-        {bg && <div style={{ position:"absolute", inset:0,
-          backgroundImage:`url(${bg})`, backgroundSize:"cover", backgroundPosition:"center",
-          filter:`blur(2px) brightness(${lit?"0.55":"0.28"})`,
-          transform:"scale(1.05)", transition:"filter 0.15s" }}/>}
-        {!bg && <div style={{ position:"absolute", inset:0, background:"#0d0d0d" }}/>}
+      <div ref={cardRef} className="film-card"
+        style={{ flex:1, position:"relative", overflow:"hidden",
+          cursor: movie||isAdmin?"pointer":"default",
+          borderRadius: isLeft?"14px 0 0 14px":"0 14px 14px 14px",
+          transform: lit ? "scale(1.03)" : "scale(1)",
+          boxShadow: lit ? `0 0 40px ${day.color}55` : "none",
+          transition:"transform 0.15s ease, box-shadow 0.15s ease" }}
+        onClick={() => !spinning && movie && handleChoose(movie.id, cardRef)}>
 
-        {/* Glow overlay when highlighted */}
-        {lit && <div style={{ position:"absolute", inset:0,
-          background:`radial-gradient(ellipse at center, ${day.color}22 0%, transparent 70%)`,
-          borderRadius:"inherit" }}/>}
-
-        {/* Border highlight */}
+        {bg
+          ? <div style={{ position:"absolute", inset:0,
+              backgroundImage:`url(${bg})`, backgroundSize:"cover", backgroundPosition:"center",
+              filter:`brightness(${lit?"0.6":"0.25"}) saturate(${lit?"1.3":"1"})`,
+              transform:"scale(1.04)", transition:"filter 0.2s" }}/>
+          : <div style={{ position:"absolute", inset:0, background:"#080808" }}/>
+        }
         <div style={{ position:"absolute", inset:0, borderRadius:"inherit",
-          border:`2px solid ${lit?day.color:"transparent"}`,
-          boxShadow:lit?`inset 0 0 30px ${day.color}22`:"none",
-          transition:"all 0.1s", pointerEvents:"none" }}/>
+          background:"linear-gradient(to bottom, transparent 25%, rgba(0,0,0,0.88) 100%)" }}/>
+        {lit && <div style={{ position:"absolute", inset:0, borderRadius:"inherit",
+          background:`radial-gradient(ellipse at 50% 30%, ${day.color}14 0%, transparent 65%)` }}/>}
+        <div style={{ position:"absolute", inset:0, borderRadius:"inherit", pointerEvents:"none",
+          border:`1.5px solid ${lit ? day.color+"99" : "rgba(255,255,255,0.04)"}`,
+          transition:"border-color 0.15s" }}/>
 
-        {/* Content */}
         <div style={{ position:"relative", height:"100%", display:"flex",
           flexDirection:"column", alignItems:"center", justifyContent:"flex-end",
-          padding:"0 10px 22px", gap:8, textAlign:"center" }}>
-          {bg
-            ? <img src={bg} alt={movie?.title}
-                style={{ width:72, height:102, objectFit:"cover", borderRadius:8,
-                  boxShadow:`0 4px 24px rgba(0,0,0,0.7)`,
-                  filter: lit?"none":"brightness(0.75)",
-                  transition:"filter 0.15s" }}/>
-            : <div style={{ width:72, height:102, borderRadius:8, background:"#181818",
-                display:"flex", alignItems:"center", justifyContent:"center", fontSize:24,
-                color:"#2a2a2a" }}>🎞</div>
-          }
+          padding:"0 12px 20px", gap:6, textAlign:"center" }}>
+          {bg && (
+            <img src={bg} alt={movie?.title}
+              style={{ width:70, height:98, objectFit:"cover", borderRadius:10,
+                boxShadow:"0 6px 28px rgba(0,0,0,0.85)",
+                filter: lit ? "none" : "brightness(0.6) saturate(0.7)",
+                transition:"filter 0.2s", border:"1px solid rgba(255,255,255,0.07)" }}/>
+          )}
+          {!bg && movie && (
+            <div style={{ width:70, height:98, borderRadius:10, background:"#111",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              fontSize:24, color:"#1e1e1e", border:"1px solid #1a1a1a" }}>🎞</div>
+          )}
           {movie ? (
             <>
-              <div style={{ fontWeight:700, fontSize:13, lineHeight:1.35,
-                color:lit?"#f0e8d8":"#888", transition:"color 0.15s",
-                textShadow:"0 1px 8px rgba(0,0,0,0.9)" }}>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700,
+                fontSize:13, lineHeight:1.35, maxWidth:110,
+                color: lit ? "#f0e8d8" : "#555",
+                transition:"color 0.15s", textShadow:"0 2px 12px rgba(0,0,0,0.95)" }}>
                 {movie.title}
               </div>
-              {movie.year && <div style={{ fontSize:11, color:"#555" }}>{movie.year}</div>}
+              {movie.year && (
+                <div style={{ fontSize:10, color: lit ? "#666" : "#2a2a2a",
+                  fontFamily:"'DM Sans',sans-serif", transition:"color 0.15s" }}>
+                  {movie.year}
+                </div>
+              )}
+              {parseDuration(movie.duration) && (() => {
+                const dl = durationLabel(parseDuration(movie.duration));
+                return (
+                  <span style={{ fontSize:9, padding:"1px 6px",
+                    background: lit ? `${dl.color}25` : `${dl.color}0e`,
+                    border:`1px solid ${lit ? dl.color+"55" : dl.color+"22"}`,
+                    borderRadius:20, color: lit ? dl.color : dl.color+"77",
+                    fontFamily:"'DM Sans',sans-serif", fontWeight:600,
+                    transition:"all 0.15s" }}>
+                    {formatDuration(parseDuration(movie.duration))}
+                  </span>
+                );
+              })()}
               {isAdmin && (
-                <button
-                  onClick={e=>{e.stopPropagation();onEditFilm(movie);}}
+                <button onClick={e=>{e.stopPropagation();onEditFilm(movie);}}
                   style={{ position:"absolute", top:10, right:10,
-                    background:"rgba(0,0,0,0.5)", border:"1px solid #333",
-                    borderRadius:6, padding:"3px 8px", color:"#444",
-                    cursor:"pointer", fontSize:10 }}>✏️</button>
+                    background:"rgba(0,0,0,0.65)", backdropFilter:"blur(6px)",
+                    border:"1px solid #252525", borderRadius:8,
+                    padding:"4px 9px", color:"#3a3a3a",
+                    cursor:"pointer", fontSize:10, transition:"color 0.15s" }}>✏️</button>
               )}
             </>
           ) : (
             isAdmin ? (
-            <button onClick={e=>{e.stopPropagation();onAddFilm();}}
-              style={{ background:`${day.color}22`, border:`1px dashed ${day.color}55`,
-                borderRadius:8, padding:"8px 14px", color:day.color,
-                cursor:"pointer", fontSize:12 }}>+ Dodaj</button>
+              <button onClick={e=>{e.stopPropagation();onAddFilm();}}
+                style={{ background:`${day.color}18`, border:`1px dashed ${day.color}44`,
+                  borderRadius:10, padding:"8px 16px", color:day.color,
+                  cursor:"pointer", fontSize:12, fontFamily:"'DM Sans',sans-serif" }}>
+                + Dodaj
+              </button>
             ) : null
           )}
         </div>
@@ -550,29 +878,40 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, onChoose, onReset,
 
   return (
     <div style={{ flex:1, display:"flex", flexDirection:"column" }}>
-      {/* Split cards */}
-      <div style={{ flex:1, display:"flex", gap:2, minHeight:0, padding:"12px 12px 0" }}>
-        <CardHalf movie={a} side="left"  lit={hlit===a?.id}/>
-        <CardHalf movie={oneFilm?null:b} side="right" lit={hlit===b?.id}/>
+      <div style={{ flex:1, display:"flex", gap:3, minHeight:0, padding:"12px 12px 0" }}>
+        <CardHalf movie={a} side="left"  lit={hlit===a?.id} cardRef={leftRef}/>
+        <CardHalf movie={oneFilm?null:b} side="right" lit={hlit===b?.id} cardRef={rightRef}/>
       </div>
 
-      {/* RNG button */}
-      <div style={{ padding:"16px 12px 12px", textAlign:"center" }}>
+      {movies.length === 2 && !spinning && (
+        <div style={{ textAlign:"center", marginTop:10,
+          fontSize:10, color:"#1e1e1e", letterSpacing:"0.16em",
+          fontFamily:"'DM Sans',sans-serif", fontWeight:600,
+          textTransform:"uppercase" }}>vs</div>
+      )}
+
+      <div style={{ padding:"10px 16px 16px", textAlign:"center" }}>
         {movies.length >= 2 ? (
-          <button onClick={doSpin} disabled={spinning}
-            style={{ background:spinning?"#111":day.color,
-              border:`2px solid ${spinning?"#1e1e1e":day.color}`,
-              borderRadius:14, padding:"14px 0", width:"100%", maxWidth:320,
-              fontWeight:900, fontSize:18, cursor:spinning?"default":"pointer",
-              color:spinning?"#444":"#060606", fontFamily:"'Cinzel',serif",
-              letterSpacing:"0.08em",
-              boxShadow:spinning?"none":`0 0 40px ${day.color}44`,
-              transition:"all 0.2s" }}>
-            {spinning?"🎲 Losuję…":"🎲 Losuj!"}
+          <button className="action-btn" onClick={doSpin} disabled={spinning}
+            style={{
+              background: spinning
+                ? "#0d0d0d"
+                : `linear-gradient(135deg, ${day.color}ee, ${day.color}aa)`,
+              border: `1.5px solid ${spinning ? "#1a1a1a" : day.color+"88"}`,
+              borderRadius:16, padding:"15px 0", width:"100%",
+              fontWeight:700, fontSize:16,
+              cursor:spinning?"default":"pointer",
+              color:spinning?"#333":"#050505",
+              fontFamily:"'Playfair Display',serif",
+              fontStyle:"italic", letterSpacing:"0.04em",
+              boxShadow: spinning ? "none" : `0 6px 36px ${day.color}44, 0 2px 8px rgba(0,0,0,0.5)`,
+              transition:"all 0.25s ease" }}>
+            {spinning ? "Losowanie…" : "🎲 Losuj film"}
           </button>
         ) : (
-          <p style={{ color:"#2a2a2a", fontSize:12 }}>
-            Kliknij plakat żeby wybrać · dodaj 2 filmy do losowania
+          <p style={{ color:"#1e1e1e", fontSize:11, fontFamily:"'DM Sans',sans-serif",
+            letterSpacing:"0.04em" }}>
+            Kliknij plakat · dodaj 2 filmy do losowania
           </p>
         )}
       </div>
@@ -647,62 +986,89 @@ function WeekView({ dayConfigs, dayMovies, currentKey, onSelectDay, onClose }) {
 
 // ─── LoginScreen ─────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
-  const [pin, setPin]   = useState("");
-  const [err, setErr]   = useState("");
-  const [busy, setBusy] = useState(false);
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState("");
+  const [shake, setShake] = useState(false);
 
-  const submit = () => {
-    if (!pin.trim()) return;
-    setBusy(true);
-    setTimeout(() => {
-      const role = login(pin.trim());
+  const handleKey = (k) => {
+    if (k === "⌫") { setPin(p => p.slice(0,-1)); setErr(""); return; }
+    if (k === "" || pin.length >= 4) return;
+    const np = pin + k;
+    setPin(np);
+    setErr("");
+    if (np.length === 4) {
+      const role = login(np);
       if (role) { onLogin(role); }
-      else { setErr("Nieprawidłowy PIN."); setPin(""); }
-      setBusy(false);
-    }, 300);
+      else {
+        setShake(true);
+        setTimeout(() => { setErr("Nieprawidłowy PIN"); setPin(""); setShake(false); }, 400);
+      }
+    }
   };
 
   return (
-    <div style={{ height:"100dvh", background:"#060606", display:"flex",
+    <div style={{ height:"100dvh", background:"var(--bg)", display:"flex",
       alignItems:"center", justifyContent:"center", padding:24,
-      fontFamily:"'Lato',sans-serif" }}>
-      <div style={{ width:"100%", maxWidth:320, textAlign:"center" }}>
-        <div style={{ fontSize:72, lineHeight:1, marginBottom:16,
-          filter:"drop-shadow(0 0 30px rgba(201,169,110,0.35))" }}>🎬</div>
-        <h1 style={{ fontFamily:"'Cinzel Decorative',serif", color:"#c9a96e",
-          fontSize:20, margin:"0 0 8px", letterSpacing:"0.05em" }}>
+      fontFamily:"'DM Sans',sans-serif",
+      backgroundImage:"radial-gradient(ellipse at 50% 0%, rgba(201,169,110,0.06) 0%, transparent 60%)" }}>
+      <GlobalStyles/>
+      <div style={{ width:"100%", maxWidth:300, textAlign:"center",
+        animation:"fadeUp 0.6s ease both" }}>
+
+        {/* Logo */}
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:20 }}>
+          <CinemaLogo size={72} glow/>
+        </div>
+
+        <h1 style={{ fontFamily:"'Playfair Display',serif", color:"var(--gold)",
+          fontSize:22, fontWeight:700, letterSpacing:"0.04em",
+          marginBottom:6, animation:"fadeUp 0.6s 0.1s ease both", opacity:0 }}>
           Filmowy Kalendarz
         </h1>
-        <p style={{ color:"#333", fontSize:13, marginBottom:32 }}>Podaj PIN żeby wejść</p>
+        <p style={{ color:"#2e2e2e", fontSize:13, marginBottom:36,
+          animation:"fadeUp 0.6s 0.2s ease both", opacity:0 }}>
+          Podaj PIN żeby wejść
+        </p>
 
         {/* PIN dots */}
-        <div style={{ display:"flex", justifyContent:"center", gap:12, marginBottom:28 }}>
+        <div style={{ display:"flex", justifyContent:"center", gap:14, marginBottom:36,
+          animation:"fadeUp 0.6s 0.25s ease both", opacity:0 }}>
           {[0,1,2,3].map(i => (
-            <div key={i} style={{ width:14, height:14, borderRadius:"50%",
-              background: pin.length > i ? "#c9a96e" : "#1e1e1e",
-              border:"1px solid #2a2a2a", transition:"background 0.15s" }}/>
+            <div key={i} style={{
+              width:12, height:12, borderRadius:"50%",
+              background: pin.length > i ? "var(--gold)" : "#141414",
+              border:`1.5px solid ${pin.length > i ? "var(--gold)" : "#252525"}`,
+              animation: pin.length > i ? "dotPop 0.2s ease both" : "none",
+              transition:"border-color 0.2s",
+              boxShadow: pin.length > i ? "0 0 10px rgba(201,169,110,0.4)" : "none"
+            }}/>
           ))}
         </div>
 
         {/* Numpad */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:16 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10,
+          animation:"fadeUp 0.6s 0.3s ease both", opacity:0,
+          transform: shake ? "translateX(0)" : undefined }}>
           {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k, i) => (
-            <button key={i} onClick={() => {
-              if (k === "⌫") { setPin(p => p.slice(0,-1)); setErr(""); }
-              else if (k !== "" && pin.length < 4) { const np = pin + k; setPin(np); setErr(""); if(np.length===4){const r=login(np);if(r){onLogin(r);}else{setErr("Nieprawidłowy PIN.");setPin("");}}}
-            }}
-              style={{ background: k===""?"transparent":"#111",
-                border: k===""?"none":"1px solid #1e1e1e",
-                borderRadius:12, padding:"18px 0",
-                color: k==="⌫"?"#555":"#e8e0d0", fontSize: k==="⌫"?18:20,
-                fontWeight:500, cursor: k===""?"default":"pointer",
-                fontFamily:"'Lato',sans-serif", transition:"background 0.1s" }}>
+            <button key={i} className="numpad-btn" onClick={() => handleKey(String(k === "" ? "" : k))}
+              style={{
+                background: k===""?"transparent":"#0d0d0d",
+                border: k===""?"none":`1px solid #1a1a1a`,
+                borderRadius:14, padding:"17px 0",
+                color: k==="⌫"?"#444":"#c8c0b0",
+                fontSize: k==="⌫"?16:19,
+                fontWeight:400, cursor: k===""?"default":"pointer",
+                fontFamily:"'DM Sans',sans-serif",
+              }}>
               {k}
             </button>
           ))}
         </div>
 
-        {err && <p style={{ color:"#e63946", fontSize:13, margin:"8px 0 0" }}>{err}</p>}
+        {err && (
+          <p style={{ color:"#e07a5f", fontSize:12, marginTop:16,
+            animation:"fadeIn 0.2s ease", letterSpacing:"0.04em" }}>{err}</p>
+        )}
       </div>
     </div>
   );
@@ -719,11 +1085,7 @@ export default function App() {
 
   const isAdmin = role === "admin";
 
-  useEffect(() => {
-    const l = document.createElement("link");
-    l.href = "https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400&family=Cinzel:wght@400;600&family=Lato:wght@300;400;700&display=swap";
-    l.rel = "stylesheet"; document.head.appendChild(l);
-  }, []);
+  // fonts loaded via GlobalStyles CSS injection
 
   useEffect(() => {
     (async () => {
@@ -770,8 +1132,16 @@ export default function App() {
     const {override,...r}=ex; return { ...p, [k]: { ...r, name, icon, color } };
   });
 
-  if (!ready) return <div style={{ background:"#060606", minHeight:"100vh" }}/>;
-  if (!role)  return <LoginScreen onLogin={r => setRole(r)} />;
+  if (!ready) return (
+    <div style={{ height:"100dvh", background:"#050505", display:"flex",
+      alignItems:"center", justifyContent:"center" }}>
+      <GlobalStyles/>
+      <div style={{ width:40, height:40, borderRadius:"50%",
+        border:"2px solid #1a1a1a", borderTopColor:"#c9a96e",
+        animation:"spinnerRing 0.8s linear infinite" }}/>
+    </div>
+  );
+  if (!role) return <LoginScreen onLogin={r => setRole(r)} />;
 
   const day    = resolveDay(selDay, dayConfigs);
   const mov    = dayMovies[selDay] || {};
@@ -779,68 +1149,79 @@ export default function App() {
   const today  = todayKey();
 
   return (
-    <div style={{ height:"100dvh", background:"#060606", color:"#e8e0d0",
-      fontFamily:"'Lato',sans-serif", display:"flex", flexDirection:"column",
+    <div style={{ height:"100dvh", background:"var(--bg)", color:"#e0d8cc",
+      fontFamily:"'DM Sans',sans-serif", display:"flex", flexDirection:"column",
       maxWidth:480, margin:"0 auto", position:"relative", overflow:"hidden" }}>
+      <GlobalStyles/>
 
       {/* ── Header ── */}
-      <div style={{ padding:"14px 16px 10px", flexShrink:0 }}>
+      <div style={{ padding:"14px 16px 10px", flexShrink:0,
+        background:"linear-gradient(to bottom, rgba(5,5,5,0.98), rgba(5,5,5,0))" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <span style={{ fontSize:28, filter:`drop-shadow(0 0 12px ${day.color}66)` }}>{day.icon}</span>
+            <span style={{ fontSize:26, filter:`drop-shadow(0 0 14px ${day.color}77)`,
+              transition:"filter 0.3s" }}>{day.icon}</span>
             <div>
-              <div style={{ fontFamily:"'Cinzel',serif", fontSize:16, color:day.color,
-                letterSpacing:"0.06em", lineHeight:1.2 }}>{day.name}</div>
+              <div style={{ fontFamily:"'Playfair Display',serif", fontWeight:700,
+                fontSize:16, color:day.color, lineHeight:1.2,
+                letterSpacing:"0.01em", transition:"color 0.3s" }}>{day.name}</div>
               {day.isTemp && (
-                <div style={{ fontSize:9, color:"#3a3a3a", letterSpacing:"0.08em" }}>
+                <div style={{ fontSize:9, color:"#2e2e2e", letterSpacing:"0.08em",
+                  fontFamily:"'DM Sans',sans-serif" }}>
                   ⏳ tymczasowy · do {day.tempUntil}
                 </div>
               )}
             </div>
           </div>
-          <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+          <div style={{ display:"flex", gap:5, alignItems:"center" }}>
             {isAdmin && (
-              <button onClick={() => setModal({type:"theme"})}
-                style={{ background:"transparent", border:"1px solid #1e1e1e", borderRadius:8,
-                  padding:"6px 10px", color:"#3a3a3a", cursor:"pointer", fontSize:12 }}>
+              <button className="action-btn" onClick={() => setModal({type:"theme"})}
+                style={{ background:"rgba(255,255,255,0.03)", border:"1px solid #1a1a1a",
+                  borderRadius:10, padding:"7px 11px", color:"#2e2e2e",
+                  cursor:"pointer", fontSize:13 }}>
                 ✏️
               </button>
             )}
-            <button onClick={() => setModal({type:"week"})}
-              style={{ background:"transparent", border:"1px solid #1e1e1e", borderRadius:8,
-                padding:"6px 10px", color:"#3a3a3a", cursor:"pointer", fontSize:12 }}>
+            <button className="action-btn" onClick={() => setModal({type:"week"})}
+              style={{ background:"rgba(255,255,255,0.03)", border:"1px solid #1a1a1a",
+                borderRadius:10, padding:"7px 11px", color:"#2e2e2e",
+                cursor:"pointer", fontSize:13 }}>
               📅
             </button>
-            <button onClick={() => { logout(); setRole(null); }}
+            <button className="action-btn" onClick={() => { logout(); setRole(null); }}
               title="Wyloguj"
-              style={{ background:"transparent", border:"1px solid #1e1e1e", borderRadius:8,
-                padding:"6px 10px", color:"#2a2a2a", cursor:"pointer", fontSize:12 }}>
+              style={{ background:"rgba(255,255,255,0.03)", border:"1px solid #1a1a1a",
+                borderRadius:10, padding:"7px 11px", color:"#1e1e1e",
+                cursor:"pointer", fontSize:13 }}>
               ⎋
             </button>
           </div>
         </div>
 
-        {/* Film count / add button */}
+        {/* Status + add buttons */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-          marginTop:10 }}>
-          <div style={{ fontSize:11, color:"#2e2e2e", letterSpacing:"0.06em" }}>
+          marginTop:9 }}>
+          <div style={{ fontSize:11, color:"#222", letterSpacing:"0.04em",
+            fontFamily:"'DM Sans',sans-serif" }}>
             {cands.length === 0 && "Brak propozycji"}
             {cands.length === 1 && "1 propozycja · dodaj drugą"}
-            {cands.length === 2 && "2 propozycje · gotowe do losowania"}
+            {cands.length === 2 && "Gotowe do losowania"}
           </div>
           {isAdmin && cands.length < 2 && !mov.chosenId && (
-            <div style={{ display:"flex", gap:6 }}>
-              <button onClick={() => setModal({type:"film"})}
-                style={{ background:`${day.color}18`, border:`1px solid ${day.color}33`,
-                  borderRadius:7, padding:"5px 12px", color:day.color,
-                  cursor:"pointer", fontSize:11, fontWeight:700 }}>
-                ➕ Film
+            <div style={{ display:"flex", gap:5 }}>
+              <button className="action-btn" onClick={() => setModal({type:"film"})}
+                style={{ background:`${day.color}15`, border:`1px solid ${day.color}30`,
+                  borderRadius:8, padding:"5px 13px", color:day.color,
+                  cursor:"pointer", fontSize:11, fontWeight:600,
+                  fontFamily:"'DM Sans',sans-serif" }}>
+                + Film
               </button>
-              <button onClick={() => setModal({type:"import"})}
-                style={{ background:"transparent", border:"1px solid #1e1e1e",
-                  borderRadius:7, padding:"5px 12px", color:"#555",
-                  cursor:"pointer", fontSize:11, fontWeight:700 }}>
-                📂 JSON
+              <button className="action-btn" onClick={() => setModal({type:"import"})}
+                style={{ background:"transparent", border:"1px solid #1a1a1a",
+                  borderRadius:8, padding:"5px 11px", color:"#333",
+                  cursor:"pointer", fontSize:11,
+                  fontFamily:"'DM Sans',sans-serif" }}>
+                JSON
               </button>
             </div>
           )}
@@ -866,27 +1247,36 @@ export default function App() {
       />
 
       {/* ── Bottom day strip ── */}
-      <div style={{ flexShrink:0, background:"#080808", borderTop:"1px solid #141414",
-        padding:"10px 8px 12px", display:"flex", gap:4, overflowX:"auto" }}>
+      <div style={{ flexShrink:0,
+        background:"linear-gradient(to top, rgba(5,5,5,1) 70%, rgba(5,5,5,0))",
+        borderTop:"1px solid #111",
+        padding:"10px 8px 14px", display:"flex", gap:3 }}>
         {BASE_DAYS.map(base => {
-          const d      = resolveDay(base.key, dayConfigs);
+          const d        = resolveDay(base.key, dayConfigs);
           const isActive = selDay === base.key;
           const isToday  = base.key === today;
           const hasMov   = (dayMovies[base.key]?.candidates||[]).length > 0;
+          const isDone   = dayMovies[base.key]?.watched;
           return (
-            <button key={base.key} onClick={() => setSelDay(base.key)}
-              style={{ flex:1, minWidth:40, background: isActive?"#151515":"transparent",
-                border:`1px solid ${isActive?d.color+"66":"#141414"}`,
-                borderRadius:10, padding:"8px 4px",
-                cursor:"pointer", transition:"all 0.15s",
-                display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
-              <span style={{ fontSize:18, lineHeight:1 }}>{d.icon}</span>
-              <span style={{ fontSize:9, color: isActive?d.color:"#444",
-                fontFamily:"'Cinzel',serif", letterSpacing:"0.04em" }}>{d.short}</span>
-              {/* dot: today or has movies */}
-              <div style={{ width:4, height:4, borderRadius:"50%",
-                background: isToday?d.color:(hasMov?"#2e2e2e":"transparent"),
-                transition:"background 0.2s" }}/>
+            <button key={base.key} className="day-btn" onClick={() => setSelDay(base.key)}
+              style={{ flex:1, minWidth:0,
+                background: isActive ? `${d.color}0e` : "transparent",
+                border:`1px solid ${isActive ? d.color+"44" : "#111"}`,
+                borderRadius:12, padding:"8px 3px",
+                cursor:"pointer",
+                display:"flex", flexDirection:"column", alignItems:"center", gap:2 }}>
+              <span style={{ fontSize:isActive?20:17, lineHeight:1,
+                transition:"font-size 0.15s",
+                filter: isActive ? `drop-shadow(0 0 8px ${d.color}88)` : "none" }}>
+                {d.icon}
+              </span>
+              <span style={{ fontSize:8, fontFamily:"'DM Sans',sans-serif", fontWeight:600,
+                letterSpacing:"0.05em", textTransform:"uppercase",
+                color: isActive ? d.color : "#2e2e2e",
+                transition:"color 0.15s" }}>{d.short}</span>
+              <div style={{ width:isActive?14:4, height:2, borderRadius:1,
+                background: isDone ? "#3a6e4a" : (isActive ? d.color : (isToday ? d.color+"55" : (hasMov ? "#1e1e1e" : "transparent"))),
+                transition:"all 0.2s ease" }}/>
             </button>
           );
         })}
