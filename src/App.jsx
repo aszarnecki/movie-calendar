@@ -88,6 +88,11 @@ const GLOBAL_CSS = `
     from { opacity:1; transform:scale(1);    filter:blur(0);   }
     to   { opacity:0; transform:scale(0.93); filter:blur(6px); }
   }
+  @keyframes confettiFall {
+    0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity:1; }
+    80%  { opacity:1; }
+    100% { transform: translateY(85vh) translateX(var(--drift)) rotate(var(--spin)); opacity:0; }
+  }
 
   .film-card { transition: transform 0.18s ease, box-shadow 0.18s ease; }
   .film-card:active { transform: scale(0.97) !important; }
@@ -650,6 +655,7 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
   const [hlit,      setHlit]      = useState(null);
   const [isExiting, setIsExiting] = useState(false);
   const [previewId, setPreviewId] = useState(null);
+  const [confetti,  setConfetti]  = useState([]);
   const justChoseRef = useRef(false); // set to true only when user actively clicks a card
   const timerRef     = useRef(null);
   const [a, b]   = movies;
@@ -664,6 +670,22 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
   const handleChoose = (id) => {
     justChoseRef.current = true;
     onChoose(id);
+  };
+
+  const fireConfetti = () => {
+    const shapes = ["🎬","🍿","⭐","🎞","🎥","✨","🎭"];
+    const pieces = Array.from({ length: 35 }, (_, i) => ({
+      id: i,
+      emoji: shapes[Math.floor(Math.random() * shapes.length)],
+      left: Math.random() * 100,
+      delay: Math.random() * 0.6,
+      duration: 1.2 + Math.random() * 1.0,
+      size: 12 + Math.random() * 14,
+      drift: -30 + Math.random() * 60,
+      spin: Math.random() * 720 - 360,
+    }));
+    setConfetti(pieces);
+    setTimeout(() => setConfetti([]), 2500);
   };
 
   const handleReset = () => {
@@ -829,6 +851,27 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
           </>}
           {!chosen.poster && <div style={{ position:"absolute", inset:0, background:"#050505" }}/>}
 
+          {/* Confetti */}
+          {confetti.length > 0 && (
+            <div style={{ position:"absolute", inset:0, zIndex:20, pointerEvents:"none", overflow:"hidden" }}>
+              {confetti.map(p => (
+                <span key={p.id} style={{
+                  position:"absolute",
+                  left:`${p.left}%`,
+                  top: -30,
+                  fontSize: p.size,
+                  animationName:"confettiFall",
+                  animationDuration:`${p.duration}s`,
+                  animationDelay:`${p.delay}s`,
+                  animationTimingFunction:"cubic-bezier(0.25,0.46,0.45,0.94)",
+                  animationFillMode:"both",
+                  ["--drift"]:`${p.drift}px`,
+                  ["--spin"]:`${p.spin}deg`,
+                }}>{p.emoji}</span>
+              ))}
+            </div>
+          )}
+
           {/* Content */}
           <div style={{ position:"relative", height:"100%", display:"flex", flexDirection:"column" }}>
             <div style={{ flex:1, minHeight:0, overflowY:"auto", display:"flex", flexDirection:"column",
@@ -890,7 +933,7 @@ function SplitHero({ day, movies, chosenId, watched, isAdmin, locked, canAdd, on
             </div>
             <div style={{ display:"flex", gap:10, padding:"10px 20px 20px", flexShrink:0 }}>
               {!watched && !locked
-                ? <button className="action-btn" onClick={onWatched}
+                ? <button className="action-btn" onClick={() => { onWatched(); fireConfetti(); }}
                     style={{ flex:1, background:`linear-gradient(135deg, ${day.color}ee, ${day.color}99)`,
                       border:"none", borderRadius:14, padding:"14px 0", color:"#050505",
                       cursor:"pointer", fontSize:14, fontWeight:700, fontFamily:"'DM Sans',sans-serif",
