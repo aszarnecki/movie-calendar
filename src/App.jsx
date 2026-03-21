@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { login, getRole, logout } from "./auth.js";
 
 const BASE_DAYS = [
   { key:"mon", name:"Azjatycki Poniedziałek", icon:"🎋", color:"#e07a5f", short:"Pon", jsDay:1 },
@@ -208,7 +209,7 @@ function ThemeModal({ dayKey, configs, onSave, onClose }) {
 }
 
 // ─── Split Hero — 2 filmy obok siebie ────────────────────────────
-function SplitHero({ day, movies, chosenId, watched, onChoose, onReset, onWatched, onEditFilm, onAddFilm, onOpenTheme }) {
+function SplitHero({ day, movies, chosenId, watched, isAdmin, onChoose, onReset, onWatched, onEditFilm, onAddFilm }) {
   const [spinning, setSpinning] = useState(false);
   const [hlit,     setHlit]     = useState(null);
   const timerRef = useRef(null);
@@ -354,18 +355,22 @@ function SplitHero({ day, movies, chosenId, watched, onChoose, onReset, onWatche
                 {movie.title}
               </div>
               {movie.year && <div style={{ fontSize:11, color:"#555" }}>{movie.year}</div>}
-              <button
-                onClick={e=>{e.stopPropagation();onEditFilm(movie);}}
-                style={{ position:"absolute", top:10, right:10,
-                  background:"rgba(0,0,0,0.5)", border:"1px solid #333",
-                  borderRadius:6, padding:"3px 8px", color:"#444",
-                  cursor:"pointer", fontSize:10 }}>✏️</button>
+              {isAdmin && (
+                <button
+                  onClick={e=>{e.stopPropagation();onEditFilm(movie);}}
+                  style={{ position:"absolute", top:10, right:10,
+                    background:"rgba(0,0,0,0.5)", border:"1px solid #333",
+                    borderRadius:6, padding:"3px 8px", color:"#444",
+                    cursor:"pointer", fontSize:10 }}>✏️</button>
+              )}
             </>
           ) : (
+            isAdmin ? (
             <button onClick={e=>{e.stopPropagation();onAddFilm();}}
               style={{ background:`${day.color}22`, border:`1px dashed ${day.color}55`,
                 borderRadius:8, padding:"8px 14px", color:day.color,
                 cursor:"pointer", fontSize:12 }}>+ Dodaj</button>
+            ) : null
           )}
         </div>
       </div>
@@ -469,13 +474,79 @@ function WeekView({ dayConfigs, dayMovies, currentKey, onSelectDay, onClose }) {
   );
 }
 
+// ─── LoginScreen ─────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [pin, setPin]   = useState("");
+  const [err, setErr]   = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = () => {
+    if (!pin.trim()) return;
+    setBusy(true);
+    setTimeout(() => {
+      const role = login(pin.trim());
+      if (role) { onLogin(role); }
+      else { setErr("Nieprawidłowy PIN."); setPin(""); }
+      setBusy(false);
+    }, 300);
+  };
+
+  return (
+    <div style={{ height:"100dvh", background:"#060606", display:"flex",
+      alignItems:"center", justifyContent:"center", padding:24,
+      fontFamily:"'Lato',sans-serif" }}>
+      <div style={{ width:"100%", maxWidth:320, textAlign:"center" }}>
+        <div style={{ fontSize:72, lineHeight:1, marginBottom:16,
+          filter:"drop-shadow(0 0 30px rgba(201,169,110,0.35))" }}>🎬</div>
+        <h1 style={{ fontFamily:"'Cinzel Decorative',serif", color:"#c9a96e",
+          fontSize:20, margin:"0 0 8px", letterSpacing:"0.05em" }}>
+          Filmowy Kalendarz
+        </h1>
+        <p style={{ color:"#333", fontSize:13, marginBottom:32 }}>Podaj PIN żeby wejść</p>
+
+        {/* PIN dots */}
+        <div style={{ display:"flex", justifyContent:"center", gap:12, marginBottom:28 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{ width:14, height:14, borderRadius:"50%",
+              background: pin.length > i ? "#c9a96e" : "#1e1e1e",
+              border:"1px solid #2a2a2a", transition:"background 0.15s" }}/>
+          ))}
+        </div>
+
+        {/* Numpad */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:16 }}>
+          {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k, i) => (
+            <button key={i} onClick={() => {
+              if (k === "⌫") { setPin(p => p.slice(0,-1)); setErr(""); }
+              else if (k !== "" && pin.length < 4) { const np = pin + k; setPin(np); setErr(""); if(np.length===4){const r=login(np);if(r){onLogin(r);}else{setErr("Nieprawidłowy PIN.");setPin("");}}}
+            }}
+              style={{ background: k===""?"transparent":"#111",
+                border: k===""?"none":"1px solid #1e1e1e",
+                borderRadius:12, padding:"18px 0",
+                color: k==="⌫"?"#555":"#e8e0d0", fontSize: k==="⌫"?18:20,
+                fontWeight:500, cursor: k===""?"default":"pointer",
+                fontFamily:"'Lato',sans-serif", transition:"background 0.1s" }}>
+              {k}
+            </button>
+          ))}
+        </div>
+
+        {err && <p style={{ color:"#e63946", fontSize:13, margin:"8px 0 0" }}>{err}</p>}
+      </div>
+    </div>
+  );
+}
+
 // ─── App ─────────────────────────────────────────────────────────
 export default function App() {
   const [dayConfigs, setDayConfigs] = useState({});
   const [dayMovies,  setDayMovies]  = useState({});
   const [selDay,     setSelDay]     = useState(todayKey());
-  const [modal,      setModal]      = useState(null); // null | {type:"film",movie?} | {type:"theme"} | {type:"week"}
+  const [modal,      setModal]      = useState(null);
   const [ready,      setReady]      = useState(false);
+  const [role,       setRole]       = useState(() => getRole());
+
+  const isAdmin = role === "admin";
 
   useEffect(() => {
     const l = document.createElement("link");
@@ -522,6 +593,7 @@ export default function App() {
   });
 
   if (!ready) return <div style={{ background:"#060606", minHeight:"100vh" }}/>;
+  if (!role)  return <LoginScreen onLogin={r => setRole(r)} />;
 
   const day    = resolveDay(selDay, dayConfigs);
   const mov    = dayMovies[selDay] || {};
@@ -548,16 +620,24 @@ export default function App() {
               )}
             </div>
           </div>
-          <div style={{ display:"flex", gap:6 }}>
-            <button onClick={() => setModal({type:"theme"})}
-              style={{ background:"transparent", border:"1px solid #1e1e1e", borderRadius:8,
-                padding:"6px 10px", color:"#3a3a3a", cursor:"pointer", fontSize:12 }}>
-              ✏️
-            </button>
+          <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+            {isAdmin && (
+              <button onClick={() => setModal({type:"theme"})}
+                style={{ background:"transparent", border:"1px solid #1e1e1e", borderRadius:8,
+                  padding:"6px 10px", color:"#3a3a3a", cursor:"pointer", fontSize:12 }}>
+                ✏️
+              </button>
+            )}
             <button onClick={() => setModal({type:"week"})}
               style={{ background:"transparent", border:"1px solid #1e1e1e", borderRadius:8,
                 padding:"6px 10px", color:"#3a3a3a", cursor:"pointer", fontSize:12 }}>
               📅
+            </button>
+            <button onClick={() => { logout(); setRole(null); }}
+              title="Wyloguj"
+              style={{ background:"transparent", border:"1px solid #1e1e1e", borderRadius:8,
+                padding:"6px 10px", color:"#2a2a2a", cursor:"pointer", fontSize:12 }}>
+              ⎋
             </button>
           </div>
         </div>
@@ -570,7 +650,7 @@ export default function App() {
             {cands.length === 1 && "1 propozycja · dodaj drugą"}
             {cands.length === 2 && "2 propozycje · gotowe do losowania"}
           </div>
-          {cands.length < 2 && !mov.chosenId && (
+          {isAdmin && cands.length < 2 && !mov.chosenId && (
             <button onClick={() => setModal({type:"film"})}
               style={{ background:`${day.color}18`, border:`1px solid ${day.color}33`,
                 borderRadius:7, padding:"5px 12px", color:day.color,
@@ -591,11 +671,12 @@ export default function App() {
         movies={cands}
         chosenId={mov.chosenId}
         watched={mov.watched}
+        isAdmin={isAdmin}
         onChoose={id => chooseMovie(selDay, id)}
         onReset={() => resetChoice(selDay)}
         onWatched={() => markWatched(selDay)}
-        onEditFilm={movie => setModal({type:"film", movie})}
-        onAddFilm={() => setModal({type:"film"})}
+        onEditFilm={movie => isAdmin && setModal({type:"film", movie})}
+        onAddFilm={() => isAdmin && setModal({type:"film"})}
       />
 
       {/* ── Bottom day strip ── */}
