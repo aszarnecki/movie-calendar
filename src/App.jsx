@@ -179,7 +179,7 @@ const THEME_PRESETS = [
   { label:"Francuski",        m:"Francuski",        f:"Francuska",        icon:"🥐", color:"#264653" },
   { label:"Brytyjski",        m:"Brytyjski",        f:"Brytyjska",       icon:"🫖", color:"#6d6875" },
   // Guilty pleasures
-  { label:"Trashowy",         m:"Trashowy",         f:"Trashowa",         icon:"🗑️", color:"#8d6e63" },
+  { label:"Trashowy",         m:"Trashowy",         f:"Trashowa",         icon:"🗑️", color:"#8d6e62" },
 ];
 
 function dateThemeIndex(dateStr) {
