@@ -148,6 +148,14 @@ const THEME_PRESETS = [
   { label:"Familijny",        m:"Familijny",        f:"Familijna",        icon:"👨‍👩‍👧‍👦", color:"#5390d9" },
   { label:"Przygodowy",       m:"Przygodowy",       f:"Przygodowa",       icon:"🌄", color:"#06d6a0" },
   { label:"Zombie",           m:"Zombie",           f:"Zombie",           icon:"🧟", color:"#38b000" },
+  { label:"Kinowy",           m:"Kinowy",           f:"Kinowa",           icon:"🎬", color:"#d4a437" },
+  { label:"Szpiegowski",      m:"Szpiegowski",      f:"Szpiegowska",      icon:"🕵️‍♂️", color:"#4a6741" },
+  { label:"Katastroficzny",   m:"Katastroficzny",   f:"Katastroficzna",   icon:"🌋", color:"#d62828" },
+  { label:"Gangsterski",      m:"Gangsterski",      f:"Gangsterska",      icon:"🤵", color:"#3d3d3d" },
+  { label:"Superbohaterski",  m:"Superbohaterski",  f:"Superbohaterska",  icon:"🦸", color:"#e63946" },
+  { label:"Sportowy",         m:"Sportowy",         f:"Sportowa",         icon:"⚽", color:"#2a9d8f" },
+  { label:"Historyczny",      m:"Historyczny",      f:"Historyczna",      icon:"🏛️", color:"#9c6644" },
+  { label:"Baśniowy",         m:"Baśniowy",         f:"Baśniowa",         icon:"🧚", color:"#e0aaff" },
   // Klimat / styl
   { label:"Mroczny",          m:"Mroczny",          f:"Mroczna",          icon:"🌑", color:"#333333" },
   { label:"Noir",             m:"Noir",             f:"Noir",             icon:"🕶️", color:"#4a4a4a" },
@@ -157,11 +165,19 @@ const THEME_PRESETS = [
   { label:"Festiwalowy",      m:"Festiwalowy",      f:"Festiwalowa",      icon:"🎥", color:"#c9a96e" },
   { label:"Blockbusterowy",   m:"Blockbusterowy",   f:"Blockbusterowa",   icon:"🍿", color:"#f4a261" },
   { label:"Książkowy",        m:"Książkowy",        f:"Książkowa",        icon:"📚", color:"#606c38" },
+  { label:"Nostalgiczny",     m:"Nostalgiczny",     f:"Nostalgiczna",     icon:"📼", color:"#b08968" },
+  { label:"Oscarowy",         m:"Oscarowy",         f:"Oscarowa",         icon:"🏆", color:"#ffd700" },
+  { label:"Surrealistyczny",  m:"Surrealistyczny",  f:"Surrealistyczna",  icon:"🌀", color:"#9b5de5" },
+  { label:"Nocny",            m:"Nocny",            f:"Nocna",            icon:"🌙", color:"#1d3557" },
+  { label:"Deszczowy",        m:"Deszczowy",        f:"Deszczowa",        icon:"🌧️", color:"#457b9d" },
+  { label:"Poetycki",         m:"Poetycki",         f:"Poetycka",         icon:"🪶", color:"#8e7f7f" },
   // Kino regionalne
   { label:"Polski",           m:"Polski",           f:"Polska",           icon:"🦅", color:"#e63946" },
   { label:"Orientalny",       m:"Orientalny",       f:"Orientalna",       icon:"🍜", color:"#e07a5f" },
   { label:"Skandynawski",     m:"Skandynawski",     f:"Skandynawska",     icon:"❄️",  color:"#a8dadc" },
   { label:"Europejski",       m:"Europejski",       f:"Europejska",       icon:"🏰", color:"#f2cc8f" },
+  { label:"Francuski",        m:"Francuski",        f:"Francuska",        icon:"🥐", color:"#264653" },
+  { label:"Brytyjski",        m:"Brytyjski",        f:"Brytyjska",       icon:"🫖", color:"#6d6875" },
   // Guilty pleasures
   { label:"Trashowy",         m:"Trashowy",         f:"Trashowa",         icon:"🗑️", color:"#8d6e63" },
 ];
@@ -1047,12 +1063,12 @@ function DayCarousel({ selDate, todayStr, dayConfigs, dayMovies, history, onSele
     if (el) el.style.cursor = "grab";
   };
 
-  // Generate dates for current month only
+  // Generate dates: 15 days back, today, 15 days forward
   const dates = [];
   const base = new Date(todayStr + "T12:00:00");
-  const lastDayNum = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
-  for (let d = 1; d <= lastDayNum; d++) {
-    const dt = new Date(base.getFullYear(), base.getMonth(), d);
+  for (let i = -15; i <= 15; i++) {
+    const dt = new Date(base);
+    dt.setDate(dt.getDate() + i);
     dates.push(dt.toISOString().slice(0,10));
   }
 
@@ -1073,7 +1089,7 @@ function DayCarousel({ selDate, todayStr, dayConfigs, dayMovies, history, onSele
       borderTop:"1px solid #141414", paddingBottom:14 }}>
       <div style={{ padding:"8px 16px 0", fontSize:9, color:"#252525", letterSpacing:"0.12em",
         textTransform:"uppercase", fontFamily:"'DM Sans',sans-serif", fontWeight:600 }}>
-        {new Date(todayStr + "T12:00:00").toLocaleDateString("pl-PL", { month:"long", year:"numeric" })}
+        {new Date(selDate + "T12:00:00").toLocaleDateString("pl-PL", { month:"long", year:"numeric" })}
       </div>
       <div ref={scrollRef}
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
@@ -1374,8 +1390,10 @@ export default function App() {
     const d = new Date(selDate + "T12:00:00");
     d.setDate(d.getDate() + (dx < 0 ? 1 : -1));
     const next = d.toISOString().slice(0,10);
-    // Stay within current month
-    if (new Date(next + "T12:00:00").getMonth() !== new Date(todayStr + "T12:00:00").getMonth()) return;
+    // Stay within ±15 days from today
+    const today = new Date(todayStr + "T12:00:00");
+    const diffDays = Math.round((d - today) / 86400000);
+    if (diffDays < -15 || diffDays > 15) return;
     goToDate(next);
   };
   const isAdmin = role === "admin";
