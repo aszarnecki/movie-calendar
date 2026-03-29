@@ -286,7 +286,33 @@ function Field({ label, value, onChange, placeholder, mono, hint }) {
 // ─── Film Add/Edit Modal ─────────────────────────────────────────
 function FilmModal({ existing, color, onSave, onClose }) {
   const [f, setF] = useState(existing || { title:"", year:"", duration:"", poster:"", desc:"", filmweb:"" });
+  const [fwUrl, setFwUrl] = useState("");
+  const [fwLoading, setFwLoading] = useState(false);
+  const [fwError, setFwError] = useState("");
   const set = k => v => setF(p => ({...p,[k]:v}));
+
+  const fetchFilmweb = async () => {
+    const url = fwUrl.trim();
+    if (!url) return;
+    setFwLoading(true);
+    setFwError("");
+    try {
+      const resp = await fetch("/api/scrape?url=" + encodeURIComponent(url));
+      const data = await resp.json();
+      if (!resp.ok) { setFwError(data.error || "Błąd pobierania"); return; }
+      setF(prev => ({
+        title:    data.title    || prev.title,
+        year:     data.year     || prev.year,
+        duration: data.duration || prev.duration,
+        poster:   data.poster   || prev.poster,
+        desc:     data.desc     || prev.desc,
+        filmweb:  data.filmweb  || url,
+      }));
+      setFwUrl("");
+    } catch { setFwError("Nie udało się połączyć z serwerem"); }
+    finally { setFwLoading(false); }
+  };
+
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:100,
       display:"flex", alignItems:"flex-end", justifyContent:"center", padding:"0 0 0 0" }}
@@ -302,6 +328,32 @@ function FilmModal({ existing, color, onSave, onClose }) {
             fontSize:20, cursor:"pointer", padding:"0 4px" }}>×</button>
         </div>
         <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          {/* Filmweb auto-fill */}
+          {!existing && (
+            <div style={{ background:"#0a0a0a", border:"1px solid #1a1a1a", borderRadius:10,
+              padding:"12px 14px" }}>
+              <label style={{ fontSize:10, color:"#ff6600", letterSpacing:"0.12em",
+                textTransform:"uppercase", display:"block", marginBottom:8,
+                fontFamily:"'DM Sans',sans-serif", fontWeight:600 }}>Pobierz z Filmweb</label>
+              <div style={{ display:"flex", gap:8 }}>
+                <input value={fwUrl} onChange={e=>setFwUrl(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&fetchFilmweb()}
+                  placeholder="Wklej link filmweb.pl/film/…"
+                  style={{ flex:1, background:"#080808", border:"1px solid #1e1e1e",
+                    borderRadius:8, padding:"10px 12px", color:"#e8e0d0", fontSize:12,
+                    outline:"none", fontFamily:"monospace" }}/>
+                <button onClick={fetchFilmweb} disabled={fwLoading || !fwUrl.trim()}
+                  style={{ background: fwUrl.trim()&&!fwLoading ? "#ff6600" : "#222",
+                    border:"none", borderRadius:8, padding:"10px 16px",
+                    color: fwUrl.trim()&&!fwLoading ? "#000" : "#555",
+                    fontWeight:700, cursor: fwUrl.trim()&&!fwLoading ? "pointer" : "default",
+                    fontSize:12, whiteSpace:"nowrap", transition:"all 0.15s" }}>
+                  {fwLoading ? "⏳" : "Pobierz"}
+                </button>
+              </div>
+              {fwError && <div style={{ fontSize:11, color:"#e07a5f", marginTop:6 }}>{fwError}</div>}
+            </div>
+          )}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 72px", gap:10 }}>
             <Field label="Tytuł *" value={f.title} onChange={set("title")} placeholder="np. Parasite"/>
             <div>
