@@ -180,12 +180,49 @@ const THEME_PRESETS = [
   { label:"Brytyjski",        m:"Brytyjski",        f:"Brytyjska",       icon:"🫖", color:"#6d6875" },
   // Guilty pleasures
   { label:"Trashowy",         m:"Trashowy",         f:"Trashowa",         icon:"🗑️", color:"#8d6e62" },
+  // Aktorskie
+  { label:"Cage'owy",          m:"Cage'owy",          f:"Cage'owa",          icon:"💥", color:"#ff6b35" },
+  { label:"Stathamowy",        m:"Stathamowy",        f:"Stathamowa",        icon:"🔫", color:"#6b705c" },
+  { label:"DiCaprio",          m:"DiCaprio",          f:"DiCaprio",          icon:"🧠", color:"#264653" },
+  { label:"Goslingowy",        m:"Goslingowy",        f:"Goslingowa",        icon:"😐", color:"#5c677d" },
+  { label:"Dafoe Artystyczny", m:"Dafoe Artystyczny", f:"Dafoe Artystyczna", icon:"💀", color:"#495057" },
+  { label:"Carrey'owy",        m:"Carrey'owy",        f:"Carrey'owa",        icon:"😂", color:"#ffbe0b" },
+  { label:"Keanu Chill",       m:"Keanu Chill",       f:"Keanu Chill",       icon:"🕶️", color:"#2b2d42" },
+  { label:"Cruise'owy",        m:"Cruise'owy",        f:"Cruise'owa",        icon:"💣", color:"#e63946" },
+  { label:"Jacksonowy",        m:"Jacksonowy",        f:"Jacksonowa",        icon:"🗣️", color:"#6a040f" },
+  { label:"Hanksowy",          m:"Hanksowy",          f:"Hanksowa",          icon:"🫡", color:"#588157" },
+  { label:"De Niro",           m:"De Niro",           f:"De Niro",           icon:"🤌", color:"#6c584c" },
+  { label:"Pacino",            m:"Pacino",            f:"Pacino",            icon:"🎭", color:"#3a0ca3" },
+  { label:"Schwarzeneggerowy", m:"Schwarzeneggerowy", f:"Schwarzeneggerowa", icon:"💪", color:"#780000" },
+  { label:"Pitt'owy",          m:"Pitt'owy",          f:"Pitt'owa",          icon:"😎", color:"#b5838d" },
+  // Reżyserskie
+  { label:"Ritchie'owy",       m:"Ritchie'owy",       f:"Ritchie'owa",       icon:"💼", color:"#6b705c" },
+  { label:"Bay'owy",            m:"Bay'owy",            f:"Bay'owa",            icon:"💣", color:"#e76f51" },
+  { label:"Ridley Scottowy",   m:"Ridley Scottowy",   f:"Ridley Scottowa",   icon:"🎬", color:"#4a4e69" },
+  { label:"Fincherowy",        m:"Fincherowy",        f:"Fincherowa",        icon:"🔪", color:"#2b2d42" },
+  { label:"Nolanowy",          m:"Nolanowy",           f:"Nolanowa",           icon:"🧠", color:"#023e8a" },
+  { label:"Tarantinowy",       m:"Tarantinowy",       f:"Tarantinowa",       icon:"🩸", color:"#9d0208" },
+  { label:"Villeneuve'owy",    m:"Villeneuve'owy",    f:"Villeneuve'owa",    icon:"🌌", color:"#14213d" },
+  { label:"Andersonowy",       m:"Andersonowy",       f:"Andersonowa",       icon:"🎨", color:"#e9c46a" },
+  { label:"Spielbergowy",      m:"Spielbergowy",      f:"Spielbergowa",      icon:"🕶️", color:"#2a9d8f" },
+  { label:"Scorsese'owy",      m:"Scorsese'owy",      f:"Scorsese'owa",      icon:"🐺", color:"#6c584c" },
+  { label:"Tony Scottowy",     m:"Tony Scottowy",     f:"Tony Scottowa",     icon:"🔥", color:"#d62828" },
+  { label:"Cameronowy",        m:"Cameronowy",        f:"Cameronowa",        icon:"👽", color:"#0077b6" },
+  { label:"Coenowy",           m:"Coenowy",           f:"Coenowa",           icon:"🎭", color:"#7f5539" },
 ];
 
+// Stable theme index using rendezvous hashing.
+// Adding new presets only affects ~1/N of dates (not ALL like modulo does).
 function dateThemeIndex(dateStr) {
-  let h = 0;
-  for (let i = 0; i < dateStr.length; i++) h = ((h << 5) - h + dateStr.charCodeAt(i)) | 0;
-  return (h >>> 0) % THEME_PRESETS.length;
+  let bestIdx = 0, bestScore = -1;
+  for (let i = 0; i < THEME_PRESETS.length; i++) {
+    const key = dateStr + "|" + THEME_PRESETS[i].label;
+    let h = 0;
+    for (let j = 0; j < key.length; j++) h = ((h << 5) - h + key.charCodeAt(j)) | 0;
+    h = h >>> 0;
+    if (h > bestScore) { bestScore = h; bestIdx = i; }
+  }
+  return bestIdx;
 }
 
 function todayKey() {
